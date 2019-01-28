@@ -29,7 +29,6 @@
 - *ts_tcs_wep - develop branch (commit: d59002a)*
 - *ts_tcs_wep_phosim - develop branch (commit: 6e4d997)*
 - *ts_tcs_ofcPython - develop branch (commit: 107811e)*
-- 
 
 ## 4. Pull the Built Image from Docker Hub
 

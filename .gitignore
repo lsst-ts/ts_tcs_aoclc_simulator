@@ -1,0 +1,17 @@
+# Python built file
+*.pyc
+*.so
+*.c
+*.o
+
+# Coverage test files
+.coverage
+htmlcov/
+
+# Pytest cache
+pytest_session.txt
+.cache/
+.pytest_cache/
+
+# Bash history
+.bash_history

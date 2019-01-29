@@ -15,3 +15,6 @@ pytest_session.txt
 
 # Bash history
 .bash_history
+
+# Output directory
+/output/*

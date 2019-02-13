@@ -74,7 +74,7 @@ class TestWepPhosimCmpt(unittest.TestCase):
 
     def testGetSeedNum(self):
 
-        self.assertEqual(self.wepPhosimCmpt.getSeedNum(), None)
+        self.assertEqual(self.wepPhosimCmpt.getSeedNum(), 0)
 
     def testSetSeedNum(self):
 
@@ -183,17 +183,20 @@ class TestWepPhosimCmpt(unittest.TestCase):
 
     def _getPssnListOfComCam(self):
 
-        opdFileDir = self._getOpdFileDirOfComCam()
-        self.wepPhosimCmpt.setOutputImgDir(opdFileDir)
-
-        pssnList = self.wepPhosimCmpt.calcOpdPssn()
+        self._setOutputImgDir()
+        pssnList = self.wepPhosimCmpt.calcComCamOpdPssn()[0]
 
         return pssnList
+
+    def _setOutputImgDir(self):
+
+        opdFileDir = self._getOpdFileDirOfComCam()
+        self.wepPhosimCmpt.setOutputImgDir(opdFileDir)
 
     def _getOpdFileDirOfComCam(self):
 
         opdFileDir = os.path.join(getModulePath(), "tests", "testData",
-                                  "comcamOpdFile")
+                                  "comcamOpdFile", "iter0")
 
         return opdFileDir
 
@@ -208,12 +211,27 @@ class TestWepPhosimCmpt(unittest.TestCase):
     def testCalcComCamGQeffFwhm(self):
 
         pssnList = self._getPssnListOfComCam()
-        gqEffFwhm = self.wepPhosimCmpt.calcComCamGQeffFwhm(pssnList)
+        gqEffFwhm = self.wepPhosimCmpt.calcComCamOpdEffFwhm(pssnList)[1]
 
         ansData = self._getAnsDataOfComCam()
         ansGqEffFwhm = ansData[1, -1]
 
         delta = np.abs(ansGqEffFwhm - gqEffFwhm)
+        self.assertLess(delta, 1e-10)
+
+    def testMapOpdToZk(self):
+
+        # Calculate the Zk from the OPD 
+        self._setOutputImgDir()
+        opdZkData = self.wepPhosimCmpt.mapOpdToZk()
+
+        # Get the answer data
+        opdFileDir = self._getOpdFileDirOfComCam()
+        ansDataFilePath = os.path.join(opdFileDir, "sim7_iter0_opd.zer")
+        ansOpdZkData = np.loadtxt(ansDataFilePath)[:, 3:]
+
+        # Do the assertion
+        delta = np.sum(np.abs(opdZkData - ansOpdZkData))
         self.assertLess(delta, 1e-10)
 
 

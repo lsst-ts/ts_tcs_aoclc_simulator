@@ -9,6 +9,8 @@ from lsst.ts.phosim.TeleFacade import TeleFacade
 
 class WepPhosimCmpt(object):
 
+    NUM_OF_ZK = 19
+
     def __init__(self, phosimDir):
         """Initialization of WEP PhoSim component class.
 
@@ -25,7 +27,7 @@ class WepPhosimCmpt(object):
 
         self.outputDir = ""
         self.outputImgDir = ""
-        self.seedNum = None
+        self.seedNum = 0
 
         self.phosimParam = {"numPro": 1,
                             "e2ADC": 1}
@@ -57,6 +59,8 @@ class WepPhosimCmpt(object):
 
         self.tele.setSensorOn(sciSensorOn=True, wfSensorOn=False,
                               guidSensorOn=False)
+
+        # The lsst is used here because the obs_lsst only supports the lsst now
         self.tele.setInstName("lsst15")
 
     def _getConfigDataPath(self):
@@ -250,6 +254,41 @@ class WepPhosimCmpt(object):
 
         self.tele.accDofInUm(dofInUm)
 
+    def setDofInUm(self, dofInUm):
+        """Set the accumulated degree of freedom (DOF) in um.
+
+        idx 0-4: M2 dz, dx, dy, rx, ry
+        idx 5-9: Cam dz, dx, dy, rx, ry
+        idx 10-29: M1M3 20 bending modes
+        idx 30-49: M2 20 bending modes
+
+        Parameters
+        ----------
+        dofInUm : list or numpy.ndarray
+            DOF in um.
+        """
+
+        self.tele.setDofInUm(dofInUm)
+
+    def saveDofInUmFileForNextIter(self, dofInUm,
+                                   dofInUmFileName="dofPertInNextIter.mat"):
+        """Save the DOF in um data to file for the next iteration.
+
+        DOF: degree of freedom.
+
+        Parameters
+        ----------
+        dofInUm : list or numpy.ndarray
+            DOF in um.
+        dofInUmFileName : str, optional
+            File name to save the DOF in um. (the default is
+            "dofPertInNextIter.mat".)
+        """
+
+        filePath = os.path.join(self.outputDir, dofInUmFileName)
+        header = "The followings are the DOF in um:"
+        np.savetxt(filePath, np.transpose(dofInUm), header=header)
+
     def runPhoSim(self, argString):
         """Run the PhoSim program.
 
@@ -261,11 +300,51 @@ class WepPhosimCmpt(object):
 
         self.tele.runPhoSim(argString)
 
-    def getOpdArgsAndFilesForPhoSim(self, cmdFileName="opd.cmd",
-                                    instFileName="opd.inst",
-                                    logFileName="opdPhoSim.log",
-                                    cmdSettingFileName="opdDefault.cmd",
-                                    instSettingFileName="opdDefault.inst"):
+    def getComCamOpdArgsAndFilesForPhoSim(
+            self, cmdFileName="opd.cmd", instFileName="opd.inst",
+            logFileName="opdPhoSim.log", cmdSettingFileName="opdDefault.cmd",
+            instSettingFileName="opdDefault.inst"):
+        """Get the OPD calculation arguments and files of ComCam for the PhoSim
+        calculation.
+
+        OPD: optical path difference.
+        ComCam: commissioning camera.
+
+        Parameters
+        ----------
+        cmdFileName : str, optional
+            Physical command file name. (the default is "opd.cmd".)
+        instFileName : str, optional
+            OPD instance file name. (the default is "opd.inst".)
+        logFileName : str, optional
+            Log file name. (the default is "opdPhoSim.log".)
+        cmdSettingFileName : str, optional
+            Physical command setting file name. (the default is
+            "opdDefault.cmd".)
+        instSettingFileName : str, optional
+            Instance setting file name. (the default is "opdDefault.inst".)
+
+        Returns
+        -------
+        str
+            Arguments to run the PhoSim.
+        """
+
+        # Set the default ComCam OPD field positions
+        self.metr.setDefaultComcamGQ()
+
+        argString = self._getOpdArgsAndFilesForPhoSim(
+            cmdFileName=cmdFileName, instFileName=instFileName,
+            logFileName=logFileName, cmdSettingFileName=cmdSettingFileName,
+            instSettingFileName=instSettingFileName)
+
+        return argString
+
+    def _getOpdArgsAndFilesForPhoSim(self, cmdFileName="opd.cmd",
+                                     instFileName="opd.inst",
+                                     logFileName="opdPhoSim.log",
+                                     cmdSettingFileName="opdDefault.cmd",
+                                     instSettingFileName="opdDefault.inst"):
         """Get the OPD calculation arguments and files for the PhoSim
         calculation.
 
@@ -385,46 +464,6 @@ class WepPhosimCmpt(object):
 
         return argString
 
-    def getComCamOpdArgsAndFilesForPhoSim(
-            self, cmdFileName="opd.cmd", instFileName="opd.inst",
-            logFileName="opdPhoSim.log", cmdSettingFileName="opdDefault.cmd",
-            instSettingFileName="opdDefault.inst"):
-        """Get the OPD calculation arguments and files of ComCam for the PhoSim
-        calculation.
-
-        OPD: optical path difference.
-        ComCam: commissioning camera.
-
-        Parameters
-        ----------
-        cmdFileName : str, optional
-            Physical command file name. (the default is "opd.cmd".)
-        instFileName : str, optional
-            OPD instance file name. (the default is "opd.inst".)
-        logFileName : str, optional
-            Log file name. (the default is "opdPhoSim.log".)
-        cmdSettingFileName : str, optional
-            Physical command setting file name. (the default is
-            "opdDefault.cmd".)
-        instSettingFileName : str, optional
-            Instance setting file name. (the default is "opdDefault.inst".)
-
-        Returns
-        -------
-        str
-            Arguments to run the PhoSim.
-        """
-
-        # Set the default ComCam OPD field positions
-        self.metr.setDefaultComcamGQ()
-
-        argString = self.getOpdArgsAndFilesForPhoSim(
-            cmdFileName=cmdFileName, instFileName=instFileName,
-            logFileName=logFileName, cmdSettingFileName=cmdSettingFileName,
-            instSettingFileName=instSettingFileName)
-
-        return argString
-
     def getStarArgsAndFilesForPhoSim(self, skySim,
                                      cmdFileName="star.cmd",
                                      instFileName="star.inst",
@@ -475,16 +514,115 @@ class WepPhosimCmpt(object):
 
         return argString
 
-    def calcOpdPssn(self):
-        """Calculate the PSSN of OPD.
+    def analyzeComCamOpdData(self, zkFileName="opd.zer",
+                             pssnFileName="PSSN.txt"):
+        """Analyze the ComCam OPD data.
+
+        ComCam: Commissioning camera.
+        OPD: optical path difference.
+        PSSN: normalized point source sensitivity.
+
+        Parameters
+        ----------
+        zkFileName : str, optional
+            OPD in zk file name. (the default is "opd.zer".)
+        pssnFileName : str, optional
+            PSSN file name. (the default is "PSSN.txt".)
+        """
+
+        self._writeOpdZkFile(zkFileName)
+        self._writeOpdPssnFile(pssnFileName)
+
+    def _writeOpdZkFile(self, zkFileName):
+        """Write the OPD in zk file.
+
+        OPD: optical path difference.
+
+        Parameters
+        ----------
+        zkFileName : str
+            OPD in zk file name.
+        """
+
+        filePath = os.path.join(self.outputImgDir, zkFileName)
+        opdData = self._mapOpdToZk()
+        header = "The followings are OPD in um from z4 to z22:"
+        np.savetxt(filePath, opdData, header=header)
+
+    def _mapOpdToZk(self):
+        """Map the OPD to the basis of annular Zernike polynomial (Zk).
+
+        OPD: optical path difference.
+
+        Returns
+        -------
+        numpy.ndarray
+            Zk data from OPD. This is a 2D array. The row is the OPD index and
+            the column is z4 to z22 in um. The order of OPD index is based on
+            the file name.
+        """
+
+        # Get the OPD file list
+        opdFileList = self._getOpdFileInDir(self.outputImgDir)
+
+        # Map the OPD to the Zk basis and do the collection
+        opdData = np.zeros((len(opdFileList), self.NUM_OF_ZK))
+        for idx, opdFile in enumerate(opdFileList):
+
+            # z1 to z22 (22 terms)
+            zk = self.metr.getZkFromOpd(opdFitsFile=opdFile)[0]
+
+            # Only need to collect z4 to z22
+            initIdx = 3
+            opdData[idx, :] = zk[initIdx:initIdx + self.NUM_OF_ZK]
+
+        return opdData
+
+    def _writeOpdPssnFile(self, pssnFileName):
+        """Write the OPD PSSN in file.
 
         OPD: optical path difference.
         PSSN: normalized point source sensitivity.
+
+        Parameters
+        ----------
+        pssnFileName : str
+            PSSN file name.
+        """
+
+        filePath = os.path.join(self.outputImgDir, pssnFileName)
+
+        # Calculate the PSSN
+        pssnList, gqEffPssn = self._calcComCamOpdPssn()
+
+        # Calculate the FWHM
+        effFwhmList, gqEffFwhm = self._calcComCamOpdEffFwhm(pssnList)
+
+        # Append the list to write the data into file
+        pssnList.append(gqEffPssn)
+        effFwhmList.append(gqEffFwhm)
+
+        # Stack the data
+        data = np.vstack((pssnList, effFwhmList))
+
+        # Write to file
+        header = "The followings are PSSN and FWHM (in arcsec) data. The final number is the GQ value."
+        np.savetxt(filePath, data, header=header)
+
+    def _calcComCamOpdPssn(self):
+        """Calculate the ComCam PSSN of OPD.
+
+        ComCam: commissioning camera.
+        OPD: optical path difference.
+        PSSN: normalized point source sensitivity.
+        GQ: gaussian quadrature.
 
         Returns
         -------
         list
             PSSN list.
+        float
+            GQ effective PSSN.
         """
 
         opdFileList = self._getOpdFileInDir(self.outputImgDir)
@@ -495,7 +633,11 @@ class WepPhosimCmpt(object):
             pssn = self.metr.calcPSSN(wavelengthInUm, opdFitsFile=opdFile)
             pssnList.append(pssn)
 
-        return pssnList
+        # Calculate the GQ effectice PSSN
+        self._setComCamWgtRatio()
+        gqEffPssn = self.metr.calcGQvalue(pssnList)
+
+        return pssnList, gqEffPssn
 
     def _getOpdFileInDir(self, opdDir):
         """Get the OPD files in the directory.
@@ -545,13 +687,22 @@ class WepPhosimCmpt(object):
 
         return fileList
 
-    def calcComCamGQeffFwhm(self, pssnList):
-        """Calculate the GQ effective FWHM of ComCam.
+    def _setComCamWgtRatio(self):
+        """Set the ComCam weighting ratio. 
 
-        GQ: Gaussian quadrature.
+        ComCam: Commissioning camera.
+        """
+
+        comcamWtRatio = np.ones(9)
+        self.metr.setWeightingRatio(comcamWtRatio)
+
+    def _calcComCamOpdEffFwhm(self, pssnList):
+        """Calculate the ComCam effective FWHM of OPD.
+
+        ComCam: commissioning camera.
         FWHM: full width and half maximum.
         PSSN: normalized point source sensitivity.
-        ComCam: commissioning camera.
+        GQ: Gaussian quadrature.
 
         Parameters
         ----------
@@ -560,6 +711,8 @@ class WepPhosimCmpt(object):
 
         Returns
         -------
+        list
+            Effective FWHM list.
         float
             GQ effective FWHM of ComCam.
         """
@@ -571,11 +724,96 @@ class WepPhosimCmpt(object):
             effFwhmList.append(effFwhm)
 
         # Calculate the GQ effectice FWHM
-        comcamWtRatio = np.ones(9)
-        self.metr.setWeightingRatio(comcamWtRatio)
+        self._setComCamWgtRatio()
         gqEffFwhm = self.metr.calcGQvalue(effFwhmList)
 
+        return effFwhmList, gqEffFwhm
+
+    def getZkFromFile(self, zkFileName):
+        """Get the zk (z4-z22) from file.
+
+        Parameters
+        ----------
+        zkFileName : str
+            Zk file name.
+
+        Returns
+        -------
+        numpy.ndarray
+            zk matrix. The colunm is z4-z22. The raw is each data point.
+        """
+
+        filePath = os.path.join(self.outputImgDir, zkFileName)
+        zk = np.loadtxt(filePath)
+
+        return zk
+
+    def getOpdPssnFromFile(self, pssnFileName):
+        """Get the OPD PSSN from file.
+
+        OPD: optical path difference.
+        PSSN: normalized point source sensitivity.
+
+        Parameters
+        ----------
+        pssnFileName : str
+            PSSN file name.
+
+        Returns
+        -------
+        numpy.ndarray
+            PSSN.
+        """
+
+        data = self._getDataOfPssnFile(pssnFileName)
+        pssn = data[0, :-1]
+
+        return pssn
+
+    def getOpdGqEffFwhmFromFile(self, pssnFileName):
+        """Get the OPD GQ effective FWHM from file.
+
+        OPD: optical path difference.
+        GQ: Gaussian quadrature.
+        FWHM: full width at half maximum.
+        PSSN: normalized point source sensitivity.
+
+        Parameters
+        ----------
+        pssnFileName : str
+            PSSN file name.
+
+        Returns
+        -------
+        float
+            OPD GQ effective FWHM.
+        """
+
+        data = self._getDataOfPssnFile(pssnFileName)
+        gqEffFwhm = data[1, -1]
+
         return gqEffFwhm
+
+    def _getDataOfPssnFile(self, pssnFileName):
+        """Get the data of the PSSN file.
+
+        PSSN: Normalized point source sensitivity.
+
+        Parameters
+        ----------
+        pssnFileName : str
+            PSSN file name.
+
+        Returns
+        -------
+        numpy.ndarray
+            Data of the PSSN file.
+        """
+
+        filePath = os.path.join(self.outputImgDir, pssnFileName)
+        data = np.loadtxt(filePath)
+
+        return data
 
 
 if __name__ == "__main__":

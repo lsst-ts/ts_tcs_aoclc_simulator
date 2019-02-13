@@ -28,5 +28,34 @@ def getModulePath(module=lsst.ts.aoclcSim, startIdx=1, endIdx=-4):
     return modulePath
 
 
+def getPhoSimPath(phosimPathVar="PHOSIMPATH"):
+    """Ge the PhoSim path from the environment variables.
+
+    Parameters
+    ----------
+    phosimPathVar : str, optional
+        PhoSim path variable name. (the default is "PHOSIMPATH".)
+
+    Returns
+    -------
+    str
+        PhoSim path.
+
+    Raises
+    ------
+    ValueError
+        Please set the 'PHOSIMPATH' environment variable.
+    """
+
+    phosimPath = None
+    try:
+        phosimPath = os.environ[phosimPathVar]
+    except Exception as KeyError:
+        raise ValueError("Please set the '%s' environment variable."
+                         % phosimPathVar)
+
+    return phosimPath
+
+
 if __name__ == "__main__":
     pass

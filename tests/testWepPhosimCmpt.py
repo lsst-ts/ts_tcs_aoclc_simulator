@@ -38,6 +38,10 @@ class TestWepPhosimCmpt(unittest.TestCase):
                                           zAngleInDeg=zAngleInDeg,
                                           rotAngInDeg=rotAngInDeg, mjd=mjd)
 
+        # Set the file name of analyzed OPD data
+        self.zkFileName = "opd.zer"
+        self.pssnFileName = "PSSN.txt"
+
     def tearDown(self):
 
         shutil.rmtree(self.outputDir)
@@ -116,21 +120,6 @@ class TestWepPhosimCmpt(unittest.TestCase):
 
         self.wepPhosimCmpt.setPhosimParam(numPro=numPro, e2ADC=e2ADC)
 
-    def testGetOpdArgsAndFilesForPhoSim(self):
-
-        self.wepPhosimCmpt.addOpdFieldXYbyDeg(0, 0)
-
-        instFileName="opd.inst"
-        argString = self.wepPhosimCmpt.getOpdArgsAndFilesForPhoSim(
-                                                    instFileName=instFileName)
-
-        self.assertEqual(len(argString), 240)
-        self.assertEqual(self._getNumOfFileInFolder(self.outputDir), 11)
-
-        instFilePath = os.path.join(self.outputDir, instFileName)
-        numOfLine = self._getNumOfLineInFile(instFilePath)
-        self.assertEqual(numOfLine, 59)
-
     def testGetComCamOpdArgsAndFilesForPhoSim(self):
 
         instFileName="opd.inst"
@@ -170,28 +159,59 @@ class TestWepPhosimCmpt(unittest.TestCase):
         numOfLine = self._getNumOfLineInFile(instFilePath)
         self.assertEqual(numOfLine, 63)
 
-    def testCalcOpdPssn(self):
+    def testSaveDofInUmFileForNextIter(self):
 
-        pssnList = self._getPssnListOfComCam()
+        dofInUm = np.arange(50)
+        dofInUmFileName = "dofPertInNextIter.mat"
+        self.wepPhosimCmpt.saveDofInUmFileForNextIter(
+                                    dofInUm, dofInUmFileName=dofInUmFileName)
 
-        ansData = self._getAnsDataOfComCam()
-        ansPssn = ansData[0, 0:9]
+        filePath = os.path.join(self.outputDir, dofInUmFileName)
+        self.assertTrue(os.path.exists(filePath))
 
-        pssnArray = np.array(pssnList)
-        delta = np.sum(np.abs(pssnArray - ansPssn))
+        data = np.loadtxt(filePath)
+        delta = np.sum(np.abs(dofInUm - data))
+        self.assertEqual(delta, 0)
+
+    def testAnalyzeComCamOpdData(self):
+
+        self._analyzeComCamOpdData()
+
+        zkFilePath = os.path.join(self.outputImgDir, self.zkFileName)
+        pssnFilePath = os.path.join(self.outputImgDir, self.pssnFileName)
+        self.assertTrue(os.path.exists(zkFilePath))
+        self.assertTrue(os.path.exists(pssnFilePath))
+
+        zk = np.loadtxt(zkFilePath)
+        ansZkFilePath = os.path.join(self._getOpdFileDirOfComCam(),
+                                     "sim7_iter0_opd.zer")
+        ansZk = np.loadtxt(ansZkFilePath)
+
+        delta = np.sum(np.abs(zk - ansZk[:, 3:]))
         self.assertLess(delta, 1e-10)
 
-    def _getPssnListOfComCam(self):
+        pssnData = np.loadtxt(pssnFilePath)
+        pssn = pssnData[0, :]
+        ansPssnFilePath = os.path.join(self._getOpdFileDirOfComCam(),
+                                       "sim7_iter0_PSSN.txt")
+        ansPssnData = np.loadtxt(ansPssnFilePath)
+        ansPssn = ansPssnData[0, :]
 
-        self._setOutputImgDir()
-        pssnList = self.wepPhosimCmpt.calcComCamOpdPssn()[0]
+        delta = np.sum(np.abs(pssn - ansPssn))
+        self.assertLess(delta, 1e-10)
 
-        return pssnList
+    def _analyzeComCamOpdData(self):
 
-    def _setOutputImgDir(self):
+        self._copyOpdToImgDirFromTestData()
+        self.wepPhosimCmpt.analyzeComCamOpdData(zkFileName=self.zkFileName,
+                                                pssnFileName=self.pssnFileName)
+
+    def _copyOpdToImgDirFromTestData(self):
 
         opdFileDir = self._getOpdFileDirOfComCam()
-        self.wepPhosimCmpt.setOutputImgDir(opdFileDir)
+        opdFileList = self.wepPhosimCmpt._getOpdFileInDir(opdFileDir)
+        for opdFile in opdFileList:
+            shutil.copy2(opdFile, self.outputImgDir)
 
     def _getOpdFileDirOfComCam(self):
 
@@ -200,39 +220,31 @@ class TestWepPhosimCmpt(unittest.TestCase):
 
         return opdFileDir
 
-    def _getAnsDataOfComCam(self):
+    def testGetZkFromFile(self):
 
-        opdFileDir = self._getOpdFileDirOfComCam()
-        ansFilePath = os.path.join(opdFileDir, "sim7_iter0_PSSN.txt")
-        ansData = np.loadtxt(ansFilePath)
+        self._analyzeComCamOpdData()
 
-        return ansData
+        # The correctness of values have been tested at the test case of
+        # testAnalyzeComCamOpdData
+        zk = self.wepPhosimCmpt.getZkFromFile(self.zkFileName)
+        self.assertEqual(zk.shape, (9, 19))
 
-    def testCalcComCamGQeffFwhm(self):
+    def testGetOpdPssnFromFile(self):
 
-        pssnList = self._getPssnListOfComCam()
-        gqEffFwhm = self.wepPhosimCmpt.calcComCamOpdEffFwhm(pssnList)[1]
+        self._analyzeComCamOpdData()
 
-        ansData = self._getAnsDataOfComCam()
-        ansGqEffFwhm = ansData[1, -1]
+        # The correctness of values have been tested at the test case of
+        # testAnalyzeComCamOpdData
+        pssn = self.wepPhosimCmpt.getOpdPssnFromFile(self.pssnFileName)
+        self.assertEqual(len(pssn), 9)
 
-        delta = np.abs(ansGqEffFwhm - gqEffFwhm)
-        self.assertLess(delta, 1e-10)
+    def testGetOpdGqEffFwhmFromFile(self):
 
-    def testMapOpdToZk(self):
+        self._analyzeComCamOpdData()
 
-        # Calculate the Zk from the OPD 
-        self._setOutputImgDir()
-        opdZkData = self.wepPhosimCmpt.mapOpdToZk()
-
-        # Get the answer data
-        opdFileDir = self._getOpdFileDirOfComCam()
-        ansDataFilePath = os.path.join(opdFileDir, "sim7_iter0_opd.zer")
-        ansOpdZkData = np.loadtxt(ansDataFilePath)[:, 3:]
-
-        # Do the assertion
-        delta = np.sum(np.abs(opdZkData - ansOpdZkData))
-        self.assertLess(delta, 1e-10)
+        gqEffFwhm = self.wepPhosimCmpt.getOpdGqEffFwhmFromFile(
+                                                    self.pssnFileName)
+        self.assertAlmostEqual(gqEffFwhm, 0.5534, places=3)
 
 
 if __name__ == "__main__":

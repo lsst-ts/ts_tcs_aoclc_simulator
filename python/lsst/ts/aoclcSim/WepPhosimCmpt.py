@@ -1,6 +1,9 @@
 import os
 import re
+import shutil
 import numpy as np
+
+from lsst.ts.wep.Utility import runProgram
 
 from lsst.ts.phosim.Utility import getModulePath
 from lsst.ts.phosim.OpdMetrology import OpdMetrology
@@ -10,6 +13,9 @@ from lsst.ts.phosim.TeleFacade import TeleFacade
 class WepPhosimCmpt(object):
 
     NUM_OF_ZK = 19
+
+    PISTON_INTRA_DIR_NAME = "intra"
+    PISTON_EXTRA_DIR_NAME = "extra"
 
     def __init__(self, phosimDir):
         """Initialization of WEP PhoSim component class.
@@ -75,6 +81,19 @@ class WepPhosimCmpt(object):
         configDataPath = os.path.join(getModulePath(), "configData")
 
         return configDataPath
+
+    def getOpdMetr(self):
+        """Get the OPD metrology object.
+
+        OPD: optical path difference.
+
+        Returns
+        -------
+        OpdMetrology
+            OPD metrology object.
+        """
+
+        return self.metr
 
     def setOutputDir(self, outputDir):
         """Set the output directory.
@@ -402,17 +421,22 @@ class WepPhosimCmpt(object):
         """
 
         # Write the perturbation file
-        pertCmdFilePath = self.tele.writePertBaseOnConfigFile(
-            self.outputDir, seedNum=self.seedNum, saveResMapFig=True,
-            pertCmdFileName="pert.cmd")
+        pertCmdFileName = "pert.cmd"
+        pertCmdFilePath = os.path.join(self.outputDir, pertCmdFileName)
+        if (not os.path.exists(pertCmdFilePath)):
+            self.tele.writePertBaseOnConfigFile(
+                    self.outputDir, seedNum=self.seedNum, saveResMapFig=True,
+                    pertCmdFileName=pertCmdFileName)
 
         # Write the physical command file
         configDataPath = self._getConfigDataPath()
         cmdSettingFile = os.path.join(configDataPath, "cmdFile",
                                       cmdSettingFileName)
-        cmdFilePath = self.tele.writeCmdFile(
-            self.outputDir, cmdSettingFile=cmdSettingFile,
-            pertFilePath=pertCmdFilePath, cmdFileName=cmdFileName)
+        cmdFilePath = os.path.join(self.outputDir, cmdFileName)
+        if (not os.path.exists(cmdFilePath)):
+            self.tele.writeCmdFile(
+                    self.outputDir, cmdSettingFile=cmdSettingFile,
+                    pertFilePath=pertCmdFilePath, cmdFileName=cmdFileName)
 
         return cmdFilePath
 
@@ -463,6 +487,82 @@ class WepPhosimCmpt(object):
             outputDir=self.outputImgDir, e2ADC=e2ADC, logFilePath=logFilePath)
 
         return argString
+
+    def getComCamStarArgsAndFilesForPhoSim(
+            self, extraObsId, intraObsId, skySim, simSeed=1000,
+            cmdSettingFileName="starDefault.cmd",
+            instSettingFileName="starSingleExp.inst"):
+        """Get the star calculation arguments and files of ComCam for the PhoSim
+        calculation.
+
+        Parameters
+        ----------
+        extraObsId : int
+            Extra-focal observation Id.
+        intraObsId : int
+            Intra-focal observation Id.
+        skySim : SkySim
+            Sky simulator
+        simSeed : int, optional
+            Random number seed. (the default is 1000.)
+        cmdSettingFileName : str, optional
+            Physical command setting file name. (the default is
+            "starDefault.cmd".)
+        instSettingFileName : {str}, optional
+            Instance setting file name. (the default is "starSingleExp.inst".)
+
+        Returns
+        -------
+        list[str]
+            List of arguments to run the PhoSim.
+        """
+
+        # Set the intra- and extra-focal related information
+        obsIdList = {"-1": extraObsId,
+                     "1": intraObsId}
+        instFileNameList = {"-1": "starExtra.inst",
+                            "1": "starIntra.inst"}
+        logFileNameList = {"-1": "starExtraPhoSim.log",
+                           "1": "starIntraPhoSim.log"}
+        outImgDirNameList = {"-1": self.PISTON_EXTRA_DIR_NAME,
+                             "1": self.PISTON_INTRA_DIR_NAME}
+
+        # Write the instance and command files of defocal conditions
+        cmdFileName = "star.cmd"
+        onFocalDofInUm = self.tele.dofInUm
+        onFocalOutputImgDir = self.outputImgDir
+        argStringList = []
+        for ii in (-1, 1):
+
+            # Set the observation ID
+            self.setSurveyParam(obsId=obsIdList[str(ii)])
+
+            # Camera piston (Change the unit from mm to um)
+            pistonInUm = np.zeros(len(onFocalDofInUm))
+            pistonInUm[5] = ii * self.tele.getDefocalDisInMm() * 1e3
+
+            # Set the new DOF that considers the piston motion
+            self.setDofInUm(onFocalDofInUm + pistonInUm)
+
+            # Update the output image directory
+            outputImgDir = os.path.join(onFocalOutputImgDir,
+                                        outImgDirNameList[str(ii)])
+            self.setOutputImgDir(outputImgDir)
+
+            # Get the argument to run the phosim
+            argString = self.getStarArgsAndFilesForPhoSim(
+                    skySim, cmdFileName=cmdFileName,
+                    instFileName=instFileNameList[str(ii)],
+                    logFileName=logFileNameList[str(ii)],
+                    simSeed=simSeed, cmdSettingFileName=cmdSettingFileName,
+                    instSettingFileName=instSettingFileName)
+            argStringList.append(argString)
+
+        # Put the internal state back to the focal plane condition
+        self.setDofInUm(onFocalDofInUm)
+        self.setOutputImgDir(onFocalOutputImgDir)
+
+        return argStringList
 
     def getStarArgsAndFilesForPhoSim(self, skySim,
                                      cmdFileName="star.cmd",
@@ -814,6 +914,37 @@ class WepPhosimCmpt(object):
         data = np.loadtxt(filePath)
 
         return data
+
+    def repackageComCamImgFromPhoSim(self):
+        """Repackage the ComCam amplifier images from PhoSim to the single 16
+        extension MEFs for processing.
+
+        ComCam: commissioning camera.
+        MEF: multi-extension frames.
+        """
+
+        # Make a temp directory
+        tmpDirPath = os.path.join(self.outputImgDir, "tmp")
+        self._makeDir(tmpDirPath)
+
+        for imgType in (self.PISTON_INTRA_DIR_NAME, self.PISTON_EXTRA_DIR_NAME):
+
+            # Repackage the images to that temp directory
+            command = "phosim_repackager.py"
+            phosimAmgImgDir = os.path.join(self.outputImgDir, imgType)
+            argstring = "%s --out_dir=%s" % (phosimAmgImgDir, tmpDirPath)
+            runProgram(command, argstring=argstring)
+
+            # Remove the image data in the original directory
+            argString = "-rf %s/lsst_a_*.fits.gz" % phosimAmgImgDir
+            runProgram("rm", argString=argString)
+
+            # Put the repackaged data into the image directory
+            argstring = "%s/*.fits %s" % (tmpDirPath, phosimAmgImgDir)
+            runProgram("mv", argstring=argstring)
+
+        # Remove the temp directory
+        shutil.rmtree(tmpDirPath)
 
 
 if __name__ == "__main__":

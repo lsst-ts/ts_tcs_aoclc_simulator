@@ -8,6 +8,7 @@ from lsst.ts.phosim.SkySim import SkySim
 from lsst.ts.aoclcSim.Utility import getModulePath, getPhoSimPath
 from lsst.ts.aoclcSim.WepPhosimCmpt import WepPhosimCmpt
 from lsst.ts.aoclcSim.OfcCmpt import OfcCmpt
+from lsst.ts.aoclcSim.WepCmpt import WepCmpt
 
 
 def _getComCamSensorNameList():
@@ -26,6 +27,8 @@ def _makeCalibs(outputDir, sensorNameList):
 
     detector = " ".join(sensorNameList)
     _genFakeFlat(fakeFlatDir, detector)
+
+    return fakeFlatDir
 
 
 def _makeDir(directory):
@@ -80,6 +83,14 @@ def _prepareOfcCmpt(filterType, rotAngInDeg):
 
     return ofcCmpt
 
+def _prepareWepCmpt(isrDirPath, filterType, rotAngInDeg):
+
+    wepCmpt = WepCmpt(isrDirPath)
+    wepCmpt.setFilter(filterType)
+    wepCmpt.setRotAng(rotAngInDeg)
+
+    return wepCmpt
+
 
 def _prepareSkySim(opdMetr):
 
@@ -90,6 +101,10 @@ def _prepareSkySim(opdMetr):
     raInDegList = opdMetr.fieldX
     declInDegList = opdMetr.fieldY
     for raInDeg, declInDeg in zip(raInDegList, declInDegList):
+        # It is noted that the field position might be < 0. But it is not the
+        # same case for ra (0<= ra <= 360).
+        if (raInDeg < 0):
+            raInDeg += 360.0
         skySim.addStarByRaDecInDeg(starId, raInDeg, declInDeg, mag)
         starId += 1
 
@@ -101,7 +116,12 @@ def main(phosimDirPath, iterNum, numPro):
     # Prepate the calibration products
     baseOutputDir = os.path.join(getModulePath(), "output")
     sensorNameList = _getComCamSensorNameList()
-    _makeCalibs(baseOutputDir, sensorNameList)
+    fakeFlatDir = _makeCalibs(baseOutputDir, sensorNameList)
+
+    # Make the ISR directory
+    isrDirName = "input"
+    isrDir = os.path.join(baseOutputDir, isrDirName)
+    _makeDir(isrDir)
 
     # Survey parameters
     filterType = FilterType.REF
@@ -110,7 +130,11 @@ def main(phosimDirPath, iterNum, numPro):
     # Prepare the components
     wepPhosimCmpt = _prepareWepPhosimCmpt(phosimDirPath, filterType,
                                           rotAngInDeg, numPro)
+    wepCmpt = _prepareWepCmpt(isrDir, filterType, rotAngInDeg)
     ofcCmpt = _prepareOfcCmpt(filterType, rotAngInDeg)
+
+    # Ingest the calibration products
+    wepCmpt.ingestCalibs(fakeFlatDir)
 
     # Set the telescope state to be the same as the OFC
     state0 = ofcCmpt.getState0()
@@ -157,9 +181,10 @@ def main(phosimDirPath, iterNum, numPro):
         # Prepare the faked sky according to the OPD field positions
         skySim = _prepareSkySim(wepPhosimCmpt.getOpdMetr())
 
-        # Output the sky information. This is for the WepCmpt to use.
+        # Output the sky information.
         outputSkyInfoFilePath = os.path.join(outputDir, skyInfoFileName)
         skySim.exportSkyToFile(outputSkyInfoFilePath)
+        wepCmpt.setSkyFile(outputSkyInfoFilePath)
 
         # Assign the entra- and intra-focal observation Id
         extraObsId = obsId + 1
@@ -176,18 +201,39 @@ def main(phosimDirPath, iterNum, numPro):
         # Repackage the images
         wepPhosimCmpt.repackageComCamImgFromPhoSim()
 
+        # Collect the defocal images
+        intraRawExpData = RawExpData()
+        intraRawExpDir = os.path.join(outputImgDir, 
+                                      wepPhosimCmpt.PISTON_INTRA_DIR_NAME)
+        intraRawExpData.append(intraObsId, 0, intraRawExpDir)
+
+        extraRawExpData = RawExpData()
+        extraRawExpDir = os.path.join(outputImgDir,
+                                      wepPhosimCmpt.PISTON_EXTRA_DIR_NAME)
+        extraRawExpData.append(extraObsId, 0, extraRawExpDir)
+
+        # Let WepCmpt to get the data and calculate the wavefront error
+        wfErrMap = wepCmpt.calculateWavefrontErrorsComCam(intraRawExpData,
+                                                          extraRawExpData)
+
+        # Save the wf error map with the same sensor name list order as OPD
+        # This will also change the wf error unit from nm to um
+        wepPhosimCmpt.reorderAndSaveWfErrFile(
+                                wfErrMap, sensorNameList, zkFileName="wfs.zer")
+
         # Get the PSSN from file
         pssn = wepPhosimCmpt.getOpdPssnFromFile(opdPssnFileName)
-        print(pssn)
 
         # Set the gain value in OfcCmpt by pssn
         ofcCmpt.setGainByPSSN(pssn, sensorNameList)
 
-        # Get the OPD zk from file
-        opdZkData = wepPhosimCmpt.getZkFromFile(opdZkFileName)
-
         # Calculate the new DOF by OFC component
-        dofInUm = ofcCmpt.calcAggDofForPhoSim(opdZkData, sensorNameList)
+        wfsDataInNm = wepPhosimCmpt.getWfErrValuesAndStackToMatrix(wfErrMap)
+        wfsDataInUm = wfsDataInNm * 1e-3
+        print(wfsDataInUm.shape)
+        wfsNameList = list(wfErrMap.keys())
+        print(wfsNameList)
+        dofInUm = ofcCmpt.calcAggDofForPhoSim(wfsDataInUm, wfsNameList)
 
         # Set the new DOF to wepPhosimCmpt
         wepPhosimCmpt.setDofInUm(dofInUm)
@@ -206,9 +252,9 @@ if __name__ == "__main__":
     phosimDirPath = getPhoSimPath()
 
     # Processor Number
-    numPro = 1
+    numPro = 9
 
     # Iteration number
-    iterNum = 1
+    iterNum = 5
 
     main(phosimDirPath, iterNum, numPro)

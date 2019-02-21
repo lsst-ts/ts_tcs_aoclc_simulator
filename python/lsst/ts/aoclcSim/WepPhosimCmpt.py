@@ -937,7 +937,7 @@ class WepPhosimCmpt(object):
 
             # Remove the image data in the original directory
             argString = "-rf %s/lsst_a_*.fits.gz" % phosimAmgImgDir
-            runProgram("rm", argString=argString)
+            runProgram("rm", argstring=argString)
 
             # Put the repackaged data into the image directory
             argstring = "%s/*.fits %s" % (tmpDirPath, phosimAmgImgDir)
@@ -945,6 +945,37 @@ class WepPhosimCmpt(object):
 
         # Remove the temp directory
         shutil.rmtree(tmpDirPath)
+
+    def reorderAndSaveWfErrFile(self, wfErrMap, refSensorNameList,
+                                zkFileName="wfs.zer"):
+
+        # Get the sensor name that in the wavefront error map
+        nameListInWfErrMap = list(wfErrMap.keys())
+
+        # Reorder the wavefront error map based on the reference sensor name
+        # list. The wavefront error unit will change from nm to um.
+        reorderedWfErrMap = dict()
+        for sensorName in refSensorNameList:
+            if sensorName in nameListInWfErrMap:
+                # Change the unit from nm to um
+                wfErr = wfErrMap[sensorName] * 1e-3
+            else:
+                wfErr = np.zeros(self.NUM_OF_ZK)
+            reorderedWfErrMap[sensorName] = wfErr
+
+        # Save the file
+        filePath = os.path.join(self.outputImgDir, zkFileName)
+        wfsData = self.getWfErrValuesAndStackToMatrix(reorderedWfErrMap)
+        header = "The followings are ZK in um from z4 to z22:"
+        np.savetxt(filePath, wfsData, header=header)
+
+    def getWfErrValuesAndStackToMatrix(self, wfErrMap):
+
+        valueMatrix = np.empty((0, self.NUM_OF_ZK))
+        for wfErr in wfErrMap.values():
+            valueMatrix = np.vstack((valueMatrix, wfErr))
+
+        return valueMatrix
 
 
 if __name__ == "__main__":

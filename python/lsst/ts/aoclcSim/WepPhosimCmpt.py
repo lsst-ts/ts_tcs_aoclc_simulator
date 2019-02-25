@@ -289,6 +289,22 @@ class WepPhosimCmpt(object):
 
         self.tele.setDofInUm(dofInUm)
 
+    def getDofInUm(self):
+        """Get the accumulated degree of freedom (DOF) in um.
+
+        idx 0-4: M2 dz, dx, dy, rx, ry
+        idx 5-9: Cam dz, dx, dy, rx, ry
+        idx 10-29: M1M3 20 bending modes
+        idx 30-49: M2 20 bending modes
+
+        Returns
+        -------
+        numpy.ndarray
+            DOF in um.
+        """
+
+        return self.tele.dofInUm
+
     def saveDofInUmFileForNextIter(self, dofInUm,
                                    dofInUmFileName="dofPertInNextIter.mat"):
         """Save the DOF in um data to file for the next iteration.
@@ -529,7 +545,7 @@ class WepPhosimCmpt(object):
 
         # Write the instance and command files of defocal conditions
         cmdFileName = "star.cmd"
-        onFocalDofInUm = self.tele.dofInUm
+        onFocalDofInUm = self.getDofInUm()
         onFocalOutputImgDir = self.outputImgDir
         argStringList = []
         for ii in (-1, 1):

@@ -60,25 +60,67 @@ class TestOfcCmpt(unittest.TestCase):
         return sensorNameList
 
     def testGetFilter(self):
-        pass
+
+        filterType = self.ofcCmpt.getFilter()
+        self.assertEqual(filterType, FilterType.REF)
 
     def testSetFilter(self):
-        pass
+
+        filterType = FilterType.R
+        self.ofcCmpt.setFilter(filterType)
+
+        self.assertEqual(self.ofcCmpt.getFilter(), filterType)
 
     def testGetRotAng(self):
-        pass
+
+        rotAng = self.ofcCmpt.getRotAng()
+        self.assertEqual(rotAng, 0.0)
 
     def testSetRotAng(self):
-        pass
 
-    def testSetGainByPSSN(self):
-        pass
+        rotAng = 10.0
+        self.ofcCmpt.setRotAng(rotAng)
+
+        self.assertEqual(self.ofcCmpt.getRotAng(), rotAng)
+
+    def testSetGainByPSSNwithGoodImgQuality(self):
+
+        self.assertEqual(self.ofcCmpt.ztaac.getGainInUse(), 0.0)
+
+        sensorNameList = self._getComCamSensorNameList()
+        pssn = np.ones(len(sensorNameList))
+        self.ofcCmpt.setGainByPSSN(pssn ,sensorNameList)
+
+        gainInUse = self.ofcCmpt.ztaac.getGainInUse()
+        self.assertEqual(gainInUse, 0.7)
+
+    def testSetGainByPSSNwithBadImgQuality(self):
+
+        self.assertEqual(self.ofcCmpt.ztaac.getGainInUse(), 0.0)
+
+        sensorNameList = self._getComCamSensorNameList()
+        pssn = np.ones(len(sensorNameList)) * 0.6
+        self.ofcCmpt.setGainByPSSN(pssn ,sensorNameList)
+
+        gainInUse = self.ofcCmpt.ztaac.getGainInUse()
+        self.assertEqual(gainInUse, 1.0)
 
     def testSetGain(self):
-        pass
+
+        self.assertEqual(self.ofcCmpt.ztaac.getGainInUse(), 0.0)
+
+        gain = 0.5
+        self.ofcCmpt.setGain(gain)
+
+        gainInUse = self.ofcCmpt.ztaac.getGainInUse()
+        self.assertEqual(gainInUse, gain)
 
     def testGetState0(self):
-        pass
+
+        state0 = self.ofcCmpt.getState0()
+
+        self.assertEqual(len(state0), 50)
+        self.assertEqual(np.sum(state0), 0)
 
 
 if __name__ == "__main__":

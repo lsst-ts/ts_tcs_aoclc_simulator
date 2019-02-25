@@ -6,6 +6,7 @@ import unittest
 from lsst.ts.wep.Utility import FilterType
 
 from lsst.ts.phosim.SkySim import SkySim
+from lsst.ts.phosim.OpdMetrology import OpdMetrology
 
 from lsst.ts.aoclcSim.Utility import getModulePath
 from lsst.ts.aoclcSim.WepPhosimCmpt import WepPhosimCmpt
@@ -134,7 +135,7 @@ class TestWepPhosimCmpt(unittest.TestCase):
         self.assertEqual(numOfLine, 67)
 
     def _getNumOfFileInFolder(self, folder):
-        
+
         return len([name for name in os.listdir(folder) 
                    if os.path.isfile(os.path.join(folder, name))])
 
@@ -145,8 +146,7 @@ class TestWepPhosimCmpt(unittest.TestCase):
 
     def testGetStarArgsAndFilesForPhoSim(self):
 
-        skySim = SkySim()
-        skySim.addStarByRaDecInDeg(0, 0.1, 0.2, 5.0)
+        skySim = self._addSglStarToSkySim()
 
         instFileName="star.inst"
         argString = self.wepPhosimCmpt.getStarArgsAndFilesForPhoSim(
@@ -158,6 +158,13 @@ class TestWepPhosimCmpt(unittest.TestCase):
         instFilePath = os.path.join(self.outputDir, instFileName)
         numOfLine = self._getNumOfLineInFile(instFilePath)
         self.assertEqual(numOfLine, 63)
+
+    def _addSglStarToSkySim(self):
+
+        skySim = SkySim()
+        skySim.addStarByRaDecInDeg(0, 0.1, 0.2, 5.0)
+
+        return skySim
 
     def testSaveDofInUmFileForNextIter(self):
 
@@ -247,28 +254,141 @@ class TestWepPhosimCmpt(unittest.TestCase):
         self.assertAlmostEqual(gqEffFwhm, 0.5534, places=3)
 
     def testGetOpdMetr(self):
-        pass
+
+        metr = self.wepPhosimCmpt.getOpdMetr()
+        self.assertTrue(isinstance(metr, OpdMetrology))
 
     def testAddOpdFieldXYbyDeg(self):
-        pass
+
+        fieldXInDegree = 1.2
+        fieldYInDegree = 1.3
+        self.wepPhosimCmpt.addOpdFieldXYbyDeg(fieldXInDegree, fieldYInDegree)
+
+        metr = self.wepPhosimCmpt.getOpdMetr()
+        self.assertEqual(len(metr.fieldX), 1)
+        self.assertEqual(len(metr.fieldY), 1)
+
+        self.assertEqual(metr.fieldX[0], fieldXInDegree)
+        self.assertEqual(metr.fieldY[0], fieldYInDegree)
+
+    def testGetDofInUm(self):
+
+        dofInUm = self.wepPhosimCmpt.getDofInUm()
+        self.assertEqual(len(dofInUm), 50)
+        self.assertEqual(np.sum(np.abs(dofInUm)), 0)
 
     def testAccDofInUm(self):
-        pass
+
+        accDofInUm = np.arange(50)
+        repeatTimes = 2
+        for ii in range(repeatTimes):
+            self.wepPhosimCmpt.accDofInUm(accDofInUm)
+
+        dofInUm = self.wepPhosimCmpt.getDofInUm()
+        delta = np.sum(np.abs(dofInUm - repeatTimes * accDofInUm))
+        self.assertEqual(delta, 0)
 
     def testSetDofInUm(self):
-        pass
+
+        settingDofInUm = np.arange(50)
+        self.wepPhosimCmpt.setDofInUm(settingDofInUm)
+
+        dofInUm = self.wepPhosimCmpt.getDofInUm()
+        delta = np.sum(np.abs(dofInUm - settingDofInUm))
+        self.assertEqual(delta, 0)
 
     def testGetComCamStarArgsAndFilesForPhoSim(self):
-        pass
+
+        extraObsId = 9005000
+        intraObsId = 9005001
+        skySim = self._addSglStarToSkySim()
+        argStringList = self.wepPhosimCmpt.getComCamStarArgsAndFilesForPhoSim(
+            extraObsId, intraObsId, skySim, simSeed=1000,
+            cmdSettingFileName="starDefault.cmd",
+            instSettingFileName="starSingleExp.inst")
+
+        self.assertEqual(len(argStringList), 2)
+        self.assertEqual(len(argStringList[0]), 265)
+        self.assertEqual(self._getNumOfFileInFolder(self.outputDir), 12)
+
+        instFilePath = os.path.join(self.wepPhosimCmpt.getOutputDir(),
+                                    "starExtra.inst")
+        numOfLine = self._getNumOfLineInFile(instFilePath)
+        self.assertEqual(numOfLine, 63)
 
     def testRepackageComCamImgFromPhoSim(self):
-        pass
+
+        self._copyComCamAmpFiles()
+
+        intraFileFolderPath = os.path.join(
+            self.wepPhosimCmpt.getOutputImgDir(),
+            self.wepPhosimCmpt.PISTON_INTRA_DIR_NAME)
+        intraFileNum = self._getNumOfFileInFolder(intraFileFolderPath)
+        self.assertEqual(intraFileNum, 16)
+
+        self.wepPhosimCmpt.repackageComCamImgFromPhoSim()
+
+        intraFileNum = self._getNumOfFileInFolder(intraFileFolderPath)
+        self.assertEqual(intraFileNum, 1)
+
+        extraFileFolderPath = os.path.join(
+            self.wepPhosimCmpt.getOutputImgDir(),
+            self.wepPhosimCmpt.PISTON_EXTRA_DIR_NAME)
+        extraFileNum = self._getNumOfFileInFolder(extraFileFolderPath)
+        self.assertEqual(extraFileNum, 1)
+
+    def _copyComCamAmpFiles(self):
+
+        for imgType in (self.wepPhosimCmpt.PISTON_INTRA_DIR_NAME,
+                        self.wepPhosimCmpt.PISTON_EXTRA_DIR_NAME):
+            ampDirPath = os.path.join(getModulePath(), "tests", "testData",
+                                      "comcamAmpPhosimData", imgType)
+            dst = os.path.join(self.wepPhosimCmpt.getOutputImgDir(), imgType)
+            shutil.copytree(ampDirPath, dst)
 
     def testReorderAndSaveWfErrFile(self):
-        pass
+
+        wfErrMap = self._prepareWfErrMap()[0]
+        refSensorNameList = ["a1", "a", "a2", "b"]
+        zkFileName = "testZk.zer"
+        self.wepPhosimCmpt.reorderAndSaveWfErrFile(
+            wfErrMap, refSensorNameList, zkFileName=zkFileName)
+
+        zkFilePath = os.path.join(self.wepPhosimCmpt.getOutputImgDir(),
+                                  zkFileName)
+        zkInFile = np.loadtxt(zkFilePath)
+
+        self.assertEqual(zkInFile.shape,
+                         (len(refSensorNameList), self.wepPhosimCmpt.NUM_OF_ZK))
+
+        self.assertEqual(np.sum(zkInFile[0, :]), 0)
+        self.assertEqual(np.sum(zkInFile[2, :]), 0)
+
+        delta = np.sum(np.abs(zkInFile[1, :] * 1e3 - wfErrMap["a"]))
+        self.assertLess(delta, 1e-10)
+
+        delta = np.sum(np.abs(zkInFile[3, :] * 1e3 - wfErrMap["b"]))
+        self.assertLess(delta, 1e-10)
+
+    def _prepareWfErrMap(self):
+
+        sensorNameList = ["c", "b", "a"]
+        wfsValueMatrix = np.random.rand(len(sensorNameList),
+                                        self.wepPhosimCmpt.NUM_OF_ZK)
+        wfErrMap = dict()
+        for idx, sensorName in enumerate(sensorNameList):
+            wfErrMap[sensorName] = wfsValueMatrix[idx, :]
+
+        return wfErrMap, wfsValueMatrix
 
     def testGetWfErrValuesAndStackToMatrix(self):
-        pass
+
+        wfErrMap, wfsValueMatrix = self._prepareWfErrMap()
+        valueMatrix = \
+            self.wepPhosimCmpt.getWfErrValuesAndStackToMatrix(wfErrMap)
+
+        delta = np.sum(np.abs(valueMatrix - wfsValueMatrix))
+        self.assertEqual(delta, 0)
 
 
 if __name__ == "__main__":

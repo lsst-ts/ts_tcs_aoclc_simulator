@@ -144,6 +144,19 @@ class WepCmpt(object):
 
         return configDataPath
 
+    def getWepController(self):
+        """Get the WEP controller.
+
+        WEP: wavefront estimation pipeline.
+
+        Returns
+        -------
+        WepController
+            WEP controller.
+        """
+
+        return self.wepCntlr
+
     def disconnect(self):
         """Disconnect the database."""
 

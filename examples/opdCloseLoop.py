@@ -132,5 +132,6 @@ if __name__ == "__main__":
     phosimDirPath = getPhoSimPath()
 
     # Iteration number
-    iterNum = 3
+    iterNum = 5
+
     main(phosimDirPath, iterNum)

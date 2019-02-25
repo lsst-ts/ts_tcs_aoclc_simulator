@@ -948,6 +948,23 @@ class WepPhosimCmpt(object):
 
     def reorderAndSaveWfErrFile(self, wfErrMap, refSensorNameList,
                                 zkFileName="wfs.zer"):
+        """Reorder the wavefront error in the wavefront error map according to
+        the reference sensor name list and save to a file.
+
+        The unexisted wavefront error will be a numpy zero array. The unit is
+        um.
+
+        Parameters
+        ----------
+        wfErrMap : dict
+            Calculated wavefront error. The dictionary key [str] is the
+            abbreviated sensor name (e.g. R22_S11). The dictionary item
+            [numpy.ndarray] is the averaged wavefront error (z4-z22) in nm.
+        refSensorNameList : list
+            Reference sensor name list
+        zkFileName : str, optional
+            Wavefront error file name. (the default is "wfs.zer".)
+        """
 
         # Get the sensor name that in the wavefront error map
         nameListInWfErrMap = list(wfErrMap.keys())
@@ -970,6 +987,22 @@ class WepPhosimCmpt(object):
         np.savetxt(filePath, wfsData, header=header)
 
     def getWfErrValuesAndStackToMatrix(self, wfErrMap):
+        """Get the wavefront errors and stack them to be a matrix.
+
+        Parameters
+        ----------
+        wfErrMap : dict
+            Calculated wavefront error. The dictionary key [str] is the
+            abbreviated sensor name (e.g. R22_S11). The dictionary item
+            [numpy.ndarray] is the averaged wavefront error (z4-z22) in nm. 
+
+        Returns
+        -------
+        numpy.ndarray
+            Wavefront errors as a matrix. The column is z4-z22 in nm. The row is
+            the individual sensor. The order is the same as the input of
+            wfErrMap.
+        """
 
         valueMatrix = np.empty((0, self.NUM_OF_ZK))
         for wfErr in wfErrMap.values():

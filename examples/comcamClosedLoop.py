@@ -245,6 +245,9 @@ def main(phosimDirPath, iterNum, numPro):
         # Add the observation ID by 10 for the next iteration
         obsId += 10
 
+    # Disconnect the database
+    wepCmpt.disconnect()
+
 
 if __name__ == "__main__":
 

@@ -59,6 +59,27 @@ class TestOfcCmpt(unittest.TestCase):
                           "R22_S12", "R22_S20", "R22_S21", "R22_S22"]
         return sensorNameList
 
+    def testGetFilter(self):
+        pass
+
+    def testSetFilter(self):
+        pass
+
+    def testGetRotAng(self):
+        pass
+
+    def testSetRotAng(self):
+        pass
+
+    def testSetGainByPSSN(self):
+        pass
+
+    def testSetGain(self):
+        pass
+
+    def testGetState0(self):
+        pass
+
 
 if __name__ == "__main__":
 

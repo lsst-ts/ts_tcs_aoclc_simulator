@@ -11,7 +11,7 @@
 
 *Author: Te-Wei Tsai*
 <br/>
-*Date: 2-20-2019*
+*Date: 2-25-2019*
 
 ## 2. Platform
 
@@ -26,9 +26,9 @@
 - *lsst_distrib (tag: w_2019_02)*
 - *obs_lsst - master branch (commit: 69b4a98)*
 - *phosim_utils - master branch (commit: b8d87d9)*
-- *ts_tcs_wep - develop branch (commit: 00a021b)*
-- *ts_tcs_wep_phosim - develop branch (commit: 6e4d997)*
-- *ts_tcs_ofcPython - develop branch (commit: 53ee625)*
+- *ts_tcs_wep - master branch (commit: 00a021b)*
+- *ts_tcs_wep_phosim - master branch (commit: 6e4d997)*
+- *ts_tcs_ofcPython - master branch (commit: 53ee625)*
 
 ## 4. Install the LSST Packages, obs_lsst, and phosim_utils
 
@@ -80,7 +80,7 @@ setup sims_catUtils -t $user_defined_tag -t sims_w_2019_02
 
 ## 7. Content
 
-*This module contains the following classes and functions:*
+*This module contains the following classes and functions ([class diagram](./doc/aoclcClassDiag.png)):*
 
 - **WepPhosimCmpt**: High-level component to use the module of ts_tcs_wep_phosim.
 - **WepCmpt**: High-level component to use the module of ts_tcs_wep.
@@ -89,3 +89,4 @@ setup sims_catUtils -t $user_defined_tag -t sims_w_2019_02
 ## 8. Example Script
 
 - **opdClosedLoop.py**: Closed-loop simulation in the optical path difference (OPD) level, which means only the classes of WepPhosimCmpt and OfcCmpt are used.
+- **comcamClosedLoop.py**: Closed-loop simulation of commionning camera. There are 9 stars on the center of each CCD.

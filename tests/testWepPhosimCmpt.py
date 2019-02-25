@@ -246,6 +246,30 @@ class TestWepPhosimCmpt(unittest.TestCase):
                                                     self.pssnFileName)
         self.assertAlmostEqual(gqEffFwhm, 0.5534, places=3)
 
+    def testGetOpdMetr(self):
+        pass
+
+    def testAddOpdFieldXYbyDeg(self):
+        pass
+
+    def testAccDofInUm(self):
+        pass
+
+    def testSetDofInUm(self):
+        pass
+
+    def testGetComCamStarArgsAndFilesForPhoSim(self):
+        pass
+
+    def testRepackageComCamImgFromPhoSim(self):
+        pass
+
+    def testReorderAndSaveWfErrFile(self):
+        pass
+
+    def testGetWfErrValuesAndStackToMatrix(self):
+        pass
+
 
 if __name__ == "__main__":
 

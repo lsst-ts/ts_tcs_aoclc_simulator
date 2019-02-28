@@ -4,14 +4,10 @@
 
 ## 1. Version History
 
-*Version 0.1*
-<br/>
-*Simulated the aoclc with the commionning camera (ComCam).*
-<br/>
+The version history is [here](./doc/VersionHistory.md).
 
-*Author: Te-Wei Tsai*
-<br/>
-*Date: 2-25-2019*
+*Author: Te-Wei Tsai* \
+*Date: 2-28-2019*
 
 ## 2. Platform
 
@@ -32,16 +28,11 @@
 
 ## 4. Install the LSST Packages, obs_lsst, and phosim_utils
 
-*1. Setup the LSST environment by `source $LSST_DIR/loadLSST.bash`. LSST_DIR is the directory of scientific pipeline.*
-<br/>
-*2. Install the lsst_sims by `eups distrib install lsst_sims -t sims_w_2019_02`.*
-<br/>
-*3. Install the lsst_distrib by `eups distrib install lsst_distrib -t w_2019_02`.*
-<br/>
-*4. Fix the path by `curl -sSL https://raw.githubusercontent.com/lsst/shebangtron/master/shebangtron | python`. The [shebangtron repo](https://github.com/lsst/shebangtron) has the further discussion of this.*
-<br/>
-*5. Clone the repository of [obs_lsst](https://github.com/lsst/obs_lsst) to some other directory. Under the obs_lsst directory, use `setup -k -r .` to setup the package in eups and use `scons` to build the module. It is noted that the build process is only needed for the first time.*
-<br/>
+*1. Setup the LSST environment by `source $LSST_DIR/loadLSST.bash`. LSST_DIR is the directory of scientific pipeline.* \
+*2. Install the lsst_sims by `eups distrib install lsst_sims -t sims_w_2019_02`.* \
+*3. Install the lsst_distrib by `eups distrib install lsst_distrib -t w_2019_02`.* \
+*4. Fix the path by `curl -sSL https://raw.githubusercontent.com/lsst/shebangtron/master/shebangtron | python`. The [shebangtron repo](https://github.com/lsst/shebangtron) has the further discussion of this.* \
+*5. Clone the repository of [obs_lsst](https://github.com/lsst/obs_lsst) to some other directory. Under the obs_lsst directory, use `setup -k -r .` to setup the package in eups and use `scons` to build the module. It is noted that the build process is only needed for the first time.* \
 *6. Do the step 5 for the repository of [phosim_utils](https://github.com/lsst-dm/phosim_utils.git).*
 
 ## 5. Pull the Built Image from Docker Hub
@@ -51,29 +42,25 @@
 ## 6. Use of Module
 
 *1. Setup the DM environment:*
-```
+
+```bash
 source $path_of_lsst_scientific_pipeline/loadLSST.bash
 setup sims_catUtils -t $user_defined_tag -t sims_w_2019_02
 ```
 
-*2. Setup the WEP environment:*
-<br/>
+*2. Setup the WEP environment:* \
 `export PYTHONPATH=$PYTHONPATH:$path_to_ts_tcs_wep/python`
 
-*3. Setup the OFC environment:*
-<br/>
+*3. Setup the OFC environment:* \
 `export PYTHONPATH=$PYTHONPATH:$path_to_ts_tcs_ofcPython/python`
 
-*4. Setup the wepPhoSim environment:*
-<br/>
+*4. Setup the wepPhoSim environment:* \
 `export PYTHONPATH=$PYTHONPATH:$path_to_ts_tcs_wep_phosim/python`
 
-*5. Setup the AOCLC simulator environment:*
-<br/>
+*5. Setup the AOCLC simulator environment:* \
 `export PYTHONPATH=$PYTHONPATH:$path_to_ts_tcs_aoclc_simulator/python`
 
-*6. Setup the PhoSim path variable:*
-<br/>
+*6. Setup the PhoSim path variable:* \
 `export PHOSIMPATH=$path_to_phosim_directory`
 
 *7. If use the docker image, only need to do the steps 5 and 6.*
